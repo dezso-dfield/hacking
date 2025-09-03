@@ -1,0 +1,27 @@
+Kernel Exploits: Exploiting vulnerabilities within the Linux kernel code.
+
+Sudo Misconfigurations: Abusing overly permissive sudo rules or vulnerabilities in the sudo command itself.
+
+SUID/SGID Binaries: Exploiting executables with the Set User ID or Set Group ID bits set to run them with the owner's permissions (often root).
+
+Cron Job Exploitation: Leveraging misconfigured scheduled tasks that run with higher privileges.
+
+Writable Files/Directories: Modifying sensitive files like /etc/passwd, /etc/shadow, or scripts executed by root.
+
+Capabilities Abuse: Exploiting specific kernel-level permissions (capabilities) granted to a process.
+
+PATH Variable Hijacking: Manipulating the $PATH environment variable to cause a privileged process to execute a malicious binary.
+
+Shared Object Injection: Using environment variables like LD_PRELOAD to load malicious shared libraries into a privileged process.
+
+NFS Misconfiguration: Exploiting insecure Network File System (NFS) shares, especially with the no_root_squash option enabled.
+
+Service Exploits: Finding and exploiting vulnerabilities in services running as root.
+
+Password Mining: Discovering plaintext passwords in configuration files, scripts, or user history files.
+
+Container Breakouts: Escaping from a container (like Docker or LXC) to gain access to the underlying host system.
+
+Wildcard Injection: Exploiting the use of wildcards (*) in commands run by privileged users or cron jobs.
+
+Polkit (PolicyKit) Abuse: Exploiting vulnerabilities or misconfigurations in the PolicyKit authorization service.
