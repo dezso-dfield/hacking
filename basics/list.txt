@@ -1,0 +1,19 @@
+Reverse Shells: Establishing a shell session from a compromised target machine back to an attacker's listening machine.
+
+Pivoting & Tunneling: Using a compromised host to route traffic and gain access to internal networks that are not directly reachable.
+
+Chisel: A versatile and fast TCP/UDP tunneling tool that transports traffic over HTTP, secured by SSH.
+
+Ligolo-ng: A modern and user-friendly pivoting tool that creates a virtual network interface, making routing to internal networks seamless.
+
+Hash Cracking: Using tools like Hashcat or John the Ripper to crack password hashes (e.g., from /etc/shadow) and recover the plaintext passwords.
+
+Credential Dumping: Extracting credentials (plaintext passwords, hashes, tokens, or Kerberos tickets) directly from a system's memory, such as using Mimikatz on Windows.
+
+Lateral Movement with SSH: Using stolen credentials or private SSH keys found on a compromised machine to authenticate and move to other systems within the network.
+
+Port Forwarding: Relaying a specific network port from a compromised machine to the attacker's machine, allowing direct access to a service running on the target or another internal host.
+
+Pass-the-Hash (Windows): A technique that allows an attacker to authenticate to remote servers by using a user's NTLM password hash, bypassing the need to crack it first.
+
+Data Exfiltration: The process of stealing and transferring data from a compromised network to an external location controlled by the attacker.
